@@ -1,0 +1,105 @@
+openapi: 3.0.0
+info:
+  title: Link Click Counter
+  version: 1.0.0
+paths:
+  /counters:
+    post:
+      summary: Create a new counter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                URL:
+                  type: string
+                Name:
+                  type: string
+      responses:
+        '201':
+          description: Counter created
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Bad request
+        '500':
+            description: Internal server error
+
+    get:
+      summary: Get counters
+      parameters:
+        - name: name
+          in: query
+          description: Find counters by name
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Counter'
+        '404':
+            description: Counters not found
+        '500':
+            description: Internal server error
+  /counters/{code}:
+    get:
+      summary: Redirect to URL associated with the counter
+      parameters:
+        - name: code
+          in: path
+          description: Code of the counter
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the URL associated with the counter
+        '404':
+          description: Counter not found
+        '500':
+          description: Internal server error
+  /counters/{code}/stats:
+      get:
+        summary: Get statistic for the counter
+        parameters:
+          - name: code
+            in: path
+            description: Code of the counter
+            required: true
+            schema:
+              type: string
+        responses:
+          '200':
+            description: Successful response
+            content:
+              application/json:
+                schema:
+                  type: integer
+          '404':
+            description: Counter not found
+          '500':
+            description: Internal server error
+components:
+  schemas:
+    Counter:
+      type: object
+      properties:
+        ID:
+          type: integer
+        URL:
+          type: string
+        Name:
+          type: string
+        Code:
+          type: string
