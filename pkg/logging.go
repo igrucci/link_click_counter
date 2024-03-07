@@ -11,7 +11,7 @@ func LogRequest(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		logrus.WithFields(logrus.Fields{
 			"method":  string(ctx.Method()),
 			"uri":     string(ctx.RequestURI()),
-			"headers": string(ctx.Request.Header.String()),
+			"headers": ctx.Request.Header.String(),
 			"body":    string(ctx.Request.Body()),
 		}).Info("request received")
 
@@ -21,7 +21,7 @@ func LogRequest(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 			"method":  string(ctx.Method()),
 			"uri":     string(ctx.RequestURI()),
 			"status":  ctx.Response.StatusCode(),
-			"headers": string(ctx.Response.Header.String()),
+			"headers": ctx.Response.Header.String(),
 			"body":    string(ctx.Response.Body()),
 		}).Info("request completed")
 	}

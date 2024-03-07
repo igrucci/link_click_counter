@@ -14,18 +14,11 @@ import (
 )
 
 func GetCounterStats(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
-	conn, err := dbpool.Acquire(ctx)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		logrus.Errorf("Unable to acquire connection: %v", err)
-		return
-	}
-	defer conn.Release()
 
 	code := ctx.UserValue("code")
 
 	var count int
-	err = conn.QueryRow(ctx, "select count from URL where code = $1", code).Scan(&count)
+	err := dbpool.QueryRow(ctx, "select count from URL where code = $1", code).Scan(&count)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -52,17 +45,9 @@ func GetCounterStats(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 
 func RedirectURL(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 
-	conn, err := dbpool.Acquire(ctx)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		logrus.Errorf("Unable to acquire connection: %v\n", err)
-		return
-	}
-	defer conn.Release()
-
 	code := ctx.UserValue("code")
 
-	tx, err := conn.Begin(context.Background())
+	tx, err := dbpool.Begin(context.Background())
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		logrus.Errorf("Failed to begin transaction: %v", err)
@@ -71,7 +56,7 @@ func RedirectURL(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 	defer tx.Rollback(context.Background())
 
 	var url string
-	if err := conn.QueryRow(context.Background(), "select url from URL where code = $1", code).Scan(&url); err != nil {
+	if err := dbpool.QueryRow(context.Background(), "select url from URL where code = $1", code).Scan(&url); err != nil {
 		if url == "" {
 			ctx.SetStatusCode(fasthttp.StatusNotFound)
 			logrus.Errorf("URL with code %s not found :%v", code, err)
@@ -81,14 +66,14 @@ func RedirectURL(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 		logrus.Errorf("Failed to get URL from database: %v", err)
 		return
 	}
-	_, err = conn.Exec(context.Background(), "update URL set count = count + 1 where code = $1", code)
+	_, err = dbpool.Exec(context.Background(), "update URL set count = count + 1 where code = $1", code)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		logrus.Errorf("Failed to update counter: %v", err)
 		return
 	}
 
-	_, err = conn.Exec(context.Background(), "insert into Statistic (url_id) select URL.id from URL where URL.code = $1", code)
+	_, err = dbpool.Exec(context.Background(), "insert into Statistic (url_id) select URL.id from URL where URL.code = $1", code)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		logrus.Errorf("Failed to insert into stats: %v", err)
@@ -106,29 +91,21 @@ func RedirectURL(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 }
 
 func GetCounters(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
-
-	conn, err := dbpool.Acquire(ctx)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		logrus.Errorf("Unable to acquire connection: %v", err)
-		return
-	}
-	defer conn.Release()
-
+	var err error
 	var rows pgx.Rows
 
 	if name := ctx.QueryArgs().Peek("name"); len(name) > 0 {
 
 		nameStr := string(name)
 
-		rows, err = conn.Query(ctx, "select * from URL where name = $1", nameStr)
+		rows, err = dbpool.Query(ctx, "select * from URL where name = $1", nameStr)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 			logrus.Errorf("Query failed: %v\n", err)
 			return
 		}
 	} else {
-		rows, err = conn.Query(ctx, "select * from URL")
+		rows, err = dbpool.Query(ctx, "select * from URL")
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 			logrus.Errorf("Query failed: %v\n", err)
@@ -161,14 +138,6 @@ func GetCounters(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 
 func CreateCounter(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 
-	conn, err := dbpool.Acquire(ctx)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		logrus.Errorf("Unable to acquire connection: %v", err)
-		return
-	}
-	defer conn.Release()
-
 	var requestData struct {
 		URL  string `json:"url"`
 		Name string `json:"name"`
@@ -190,7 +159,7 @@ func CreateCounter(ctx *fasthttp.RequestCtx, dbpool *pgxpool.Pool) {
 
 	code := uuid.New()
 
-	if _, err := conn.Exec(context.Background(), "insert into URL(url, name, code) values($1, $2, $3)", reqData.URL, reqData.Name, code); err != nil {
+	if _, err := dbpool.Exec(context.Background(), "insert into URL(url, name, code) values($1, $2, $3)", reqData.URL, reqData.Name, code); err != nil {
 		var pgErr *pgconn.PgError
 		errors.As(err, &pgErr)
 		if pgErr.Code == "23505" {
